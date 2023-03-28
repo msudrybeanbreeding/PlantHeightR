@@ -12,7 +12,7 @@ library("dashboardthemes")
 library("shinyjs")
 library("rgl")
 
-# install.packages("devtools")
+# install.packages("devtools") 
 # devtools::install_github("OpenDroneMap/FIELDimageR")
 
 options(shiny.maxRequestSize=100000*1024^2)
