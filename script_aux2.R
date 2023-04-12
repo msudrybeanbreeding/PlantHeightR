@@ -79,14 +79,14 @@ qthresh= 0.99
 qthreshSoil = 0.5
 ExtMet = "mean"
 Plot_ID = indPlots$Global_ID_
-cloud_names = list("C:/PH2_R/PC_veg/7_14_21_SVREC_RGB_P1.laz", "C:/PH2_R/PC_veg/7_18_21_SVREC_RGB_P1.laz")
+#cloud_names = list("C:/PH2_R/PC_veg/7_14_21_SVREC_RGB_P1.laz", "C:/PH2_R/PC_veg/7_18_21_SVREC_RGB_P1.laz")
 ##########
 
-cloud_soil <- "C:/PH2_R/PC_soil/6_8_21_SVREC_RGB_DTM.laz"
+#cloud_soil <- "C:/PH2_R/PC_soil/6_8_21_SVREC_RGB_DTM.laz"
 
 #cloud <- "C:/PH2_R/PC_veg/7_14_21_SVREC_RGB_P1.laz"
 
-cloud_list <- list("C:/PH2_R/PC_veg/7_14_21_SVREC_RGB_P1.laz", "C:/PH2_R/PC_veg/7_18_21_SVREC_RGB_P1.laz")
+#cloud_list <- list("C:/PH2_R/PC_veg/7_14_21_SVREC_RGB_P1.laz", "C:/PH2_R/PC_veg/7_18_21_SVREC_RGB_P1.laz")
 
 ## Auxiliary function for clipping point cloud by shapefile (features)
 #clipper.cloud.est.ind <- function(cloud, cloud_s, shape, id_col, qthresh, qthreshSoil, ExtMet, Plot_ID, cloud_names) {
@@ -591,7 +591,7 @@ shape_sp <- sf::as_Spatial(shape)
 
 
   
-  cloud<- "C:/PH2_R/PC_orig/original/6_8_21_SVREC_RGB_DTM_group1_densified_point_cloud.laz"
+ # cloud<- "C:/PH2_R/PC_orig/original/6_8_21_SVREC_RGB_DTM_group1_densified_point_cloud.laz"
   cloud <- readLAS(files = cloud, select = "xyz")
 
   # Select points randomly to reach an homogeneous density of 1
@@ -627,7 +627,7 @@ shape_sp <- sf::as_Spatial(shape)
   
   
   
-  cloud<- "C:/PH2_R/PC_orig/original/6_8_21_SVREC_RGB_DTM_group1_densified_point_cloud.laz"
+ # cloud<- "C:/PH2_R/PC_orig/original/6_8_21_SVREC_RGB_DTM_group1_densified_point_cloud.laz"
   shape <- st_read("C:\\PH2_R\\PlantHeightR\\Shapefile\\shp\\Shapefile_SVREV_P01_area.shp")
 
   las_file<- cloud

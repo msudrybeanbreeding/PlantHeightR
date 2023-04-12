@@ -1,0 +1,14 @@
+name: PlantHeightR
+title: PlantHeightR
+username:
+account: msudrybeanbreeding
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8836046
+bundleId: 7082191
+url: https://msudrybeanbreeding.shinyapps.io/PlantHeightR/
+when: 1681340553.10038
+lastSyncTime: 1681340553.10039
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: README.md|script_aux.R|script_aux2.R
