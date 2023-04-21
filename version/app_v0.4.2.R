@@ -91,38 +91,20 @@ clip_tab <- tabItem(
         type = "tabs",
          tabPanel("DSM",
                   br(),
-                  
-                  checkboxInput("dsm_folder_check_area", "Upload dataset", value = FALSE),
+                  actionButton("shapefile_button_clip.dsm", "Load Shp field area"),
                   br(),
-                  
-                  conditionalPanel(
-                    condition = "input.dsm_folder_check_area == false",
-                    textInput(
-                      inputId = "dsm_folder_area",
-                      label = "Enter DSM folder path (.tif):"
-                    )),
-                  conditionalPanel(
-                    condition = "input.dsm_folder_check_area == true",
-                    fileInput("dsm_upload_area", "Upload DSM File area (.tif)",  accept = c(".tif"), multiple = TRUE)
-                  ),
-                  
-                  textOutput(outputId = "dsm_folder_name_area"),
-                  textOutput(outputId = "imgFiles.dsm_area"),
-                  
-                  conditionalPanel(
-                    condition = "input.dsm_folder_check_area == false",
-                    actionButton("shapefile_button_clip.dsm", "Select Shapefile field area (.shp)", icon = icon("file"))
-                  ),
-                  conditionalPanel(
-                    condition = "input.dsm_folder_check_area == true",
-                    fileInput("shapefile_button_clip.dsm_upload", "Upload Shapefile field area (.zip)", accept = c(".zip"))
-                  ),
-                  
                   br(),
                   textOutput("shapefile_name_clip.dsm"),
+                  br(),
                   h4("Shapefile features"),
                   DT::dataTableOutput('contents_shape2'),
                   br(),
+                  textInput(
+                    inputId = "dsm_folder_area",
+                    label = "Enter DSM folder path:"
+                  ),
+                  textOutput(outputId = "dsm_folder_name_area"),
+                  textOutput(outputId = "imgFiles.dsm_area"),
                   br(),
 
                   selectInput("nameID",
@@ -144,40 +126,20 @@ clip_tab <- tabItem(
          
          tabPanel("Point Cloud",
                   br(),
-                  
-                  checkboxInput("laz_folder_check_area", "Upload dataset", value = FALSE),
+                  actionButton("shapefile_button_clip.pc", "Load Shp field area"),
                   br(),
-                  
-                  conditionalPanel(
-                    condition = "input.laz_folder_check_area == false",
-                    textInput(
-                      inputId = "laz_folder_area.pc",
-                      label = "Enter LAZ folder path (.laz):"
-                    )),
-                  
-                  conditionalPanel(
-                    condition = "input.laz_folder_check_area == true",
-                    fileInput("laz_folder_area.pc_upload", "Upload LAZ File area (.laz)", accept = c(".laz"), multiple = TRUE)
-                  ),
-                  
-                  textOutput(outputId = "laz_folder_name_area"),
-                  textOutput(outputId = "imgFiles.laz_area.pc"),
-                  
-                  conditionalPanel(
-                    condition = "input.laz_folder_check_area == false",
-                    actionButton("shapefile_button_clip.pc", "Select Shapefile field area (.shp)", icon = icon("file"))
-                  ),
-                  conditionalPanel(
-                    condition = "input.laz_folder_check_area == true",
-                    fileInput("shapefile_button_clip.pc_upload", "Upload Shapefile field area (.zip)", accept = c(".zip"))
-                  ),
-                  
                   br(),
                   textOutput("shapefile_name_clip.pc"),
+                  br(),
                   h4("Shapefile features"),
                   DT::dataTableOutput('contents_shape3'),
-
                   br(),
+                  textInput(
+                    inputId = "laz_folder_area.pc",
+                    label = "Enter LAZ folder path:"
+                  ),
+                  textOutput(outputId = "laz_folder_name_area"),
+                  textOutput(outputId = "imgFiles.laz_area.pc"),
                   br(),
                   
                   selectInput("nameID_pc",
@@ -355,7 +317,6 @@ EPH_tab <- tabItem(
       
       conditionalPanel(
         condition = "input.dsm_single == true",
-        
         numericInput("qthreshSoil_single", "Assign quantile threshold to soil:",
                      min = 0.01, max = 99.9, step = 0.1, value = NULL),
         
@@ -1934,59 +1895,52 @@ server <- function(input, output, session) {
   
   
   
+ 
   ## Load the PC files - vegetation
-laz_files_path <- reactiveVal(NULL)
-
-observeEvent(list(input$laz_folder, input$laz_upload), {
-  if (is.null(input$laz_folder_check)) {
-    return(NULL)
-  }
-  
-  if (input$laz_folder_check) {
-    # Handle LAZ file upload
-    if (!is.null(input$laz_upload)) {
-      laz_files <- input$laz_upload
-      laz_files_path(lapply(seq_along(laz_files$datapath), function(i) {
-        file.copy(laz_files$datapath[i], paste0(tempdir(), "/", laz_files$name[i]))
-        return(paste0(tempdir(), "/", laz_files$name[i]))
-      }))
-      print(laz_files_path)
-      laz_files_names <- sapply(input$laz_upload$name, function(x) gsub(".laz", "", x))
-      cat("Selected LAZ files:", laz_files_names, "\n")
-      output$laz_folder_name <- renderText("Uploaded LAZ files:")
-      output$imgFiles.laz <- renderText(paste0("Selected LAZ files: ", laz_files_names))
-      #print(laz_files_names)
-    } else {
-      cat("No LAZ files uploaded!\n")
-      output$laz_folder_name <- renderText("No LAZ files uploaded!")
-      output$imgFiles.laz <- renderText("No LAZ files uploaded!")
+  observeEvent(list(input$laz_folder, input$laz_upload), {
+    if (is.null(input$laz_folder_check)) {
+      return(NULL)
     }
-  } else {
-    # Handle LAZ folder selection
-    if (!is.null(input$laz_folder) && input$laz_folder != "") {
-      if (dir.exists(input$laz_folder)) {
-        laz_folder_name <- basename(input$laz_folder)
-        imgFiles.laz <- list.files(path = input$laz_folder, pattern="*.laz$", full.names = T) #get the LAZ 
-        imgFiles.laz <- sapply(imgFiles.laz, function(x) gsub(".laz", "", basename(x)))
-        cat("Selected LAZ folder:", laz_folder_name, "\n")
-        imgFiles.laz.list <- as.list(imgFiles.laz)
-        imgFiles.laz.list <<- sapply(imgFiles.laz.list, function(x) gsub(".laz", "", basename(x)))
-        output$laz_folder_name <- renderText(paste0("Selected LAZ folder: ", laz_folder_name))
-        output$imgFiles.laz <- renderText(paste0("Selected LAZ files: ", imgFiles.laz))
-        #print(imgFiles.laz)
+    
+    if (input$laz_folder_check) {
+      # Handle LAZ file upload
+      if (!is.null(input$laz_upload)) {
+        laz_files <- input$laz_upload$datapath
+        laz_files_names <- sapply(input$laz_upload$name, function(x) gsub(".laz", "", x))
+        cat("Selected LAZ files:", laz_files_names, "\n")
+        output$laz_folder_name <- renderText("Uploaded LAZ files:")
+        output$imgFiles.laz <- renderText(paste0("Selected LAZ files: ", laz_files_names))
+        print(laz_files_names)
       } else {
-        cat("Invalid LAZ folder path!\n")
-        output$laz_folder_name <- renderText("Invalid LAZ folder path!")
-        output$imgFiles.laz <- renderText("Invalid LAZ files path!")
+        cat("No LAZ files uploaded!\n")
+        output$laz_folder_name <- renderText("No LAZ files uploaded!")
+        output$imgFiles.laz <- renderText("No LAZ files uploaded!")
       }
     } else {
-      cat("No LAZ folder selected!\n")
-      output$laz_folder_name <- renderText("No LAZ folder selected!")
-      output$imgFiles.laz <- renderText("No LAZ files selected!")
+      # Handle LAZ folder selection
+      if (!is.null(input$laz_folder) && input$laz_folder != "") {
+        if (dir.exists(input$laz_folder)) {
+          laz_folder_name <- basename(input$laz_folder)
+          imgFiles.laz <- list.files(path = input$laz_folder, pattern="*.laz$", full.names = T) #get the LAZ 
+          imgFiles.laz <- sapply(imgFiles.laz, function(x) gsub(".laz", "", basename(x)))
+          cat("Selected LAZ folder:", laz_folder_name, "\n")
+          imgFiles.laz.list <- as.list(imgFiles.laz)
+          imgFiles.laz.list <<- sapply(imgFiles.laz.list, function(x) gsub(".laz", "", basename(x)))
+          output$laz_folder_name <- renderText(paste0("Selected LAZ folder: ", laz_folder_name))
+          output$imgFiles.laz <- renderText(paste0("Selected LAZ files: ", imgFiles.laz))
+          print(imgFiles.laz)
+        } else {
+          cat("Invalid LAZ folder path!\n")
+          output$laz_folder_name <- renderText("Invalid LAZ folder path!")
+          output$imgFiles.laz <- renderText("Invalid LAZ files path!")
+        }
+      } else {
+        cat("No LAZ folder selected!\n")
+        output$laz_folder_name <- renderText("No LAZ folder selected!")
+        output$imgFiles.laz <- renderText("No LAZ files selected!")
+      }
     }
-  }
-}, ignoreInit = TRUE)
-
+  }, ignoreInit = TRUE)
   
   
   ## Load the shapefile files - Field area DSM
@@ -2382,50 +2336,25 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   
   
   ## Selecting individual images to run - PC
-  uploaded_laz_folder <- reactiveVal(NULL)
   
   imgFiles.laz <- reactive({
-    if (is.null(input$laz_folder_check)) {
-      return(NULL)
-    }
-    
-    if (input$laz_folder_check) {
-      # Handle LAZ file upload
-      if (!is.null(input$laz_upload)) {
-        laz_files_path <- unique(dirname(unlist(laz_files_path())))
-        uploaded_laz_folder(laz_files_path)
-        files <- list.files(laz_files_path, pattern="*.laz$", full.names = TRUE)
+    if (!is.null(input$laz_folder)) {
+      if (dir.exists(input$laz_folder)) {
+        files <- list.files(path = input$laz_folder, pattern="*.laz$", full.names = T) #get the PC only 
+        print(files)
         if (length(files) == 0) {
-          print("No laz files found in the uploaded file!")
+          print("No laz files found in the selected folder!")
           return(NULL)
         } else {
-          cat("Files found in imgFiles.laz():", files, "\n")
           return(files)
         }
       } else {
-        print("No laz files uploaded!")
+        print("Invalid laz folder path!")
         return(NULL)
       }
     } else {
-      # Handle LAZ file selection
-      if (!is.null(input$laz_folder)) {
-        if (dir.exists(input$laz_folder)) {
-          files <- list.files(path = input$laz_folder, pattern="*.laz$", full.names = T) #get the PC only 
-          if (length(files) == 0) {
-            print("No laz files found in the selected folder!")
-            return(NULL)
-          } else {
-            cat("Files found in imgFiles.laz():", files, "\n")
-            return(files)
-          }
-        } else {
-          print("Invalid laz folder path!")
-          return(NULL)
-        }
-      } else {
-        print("No laz folder selected!")
-        return(NULL)
-      }
+      print("No laz folder selected!")
+      return(NULL)
     }
   })
   
@@ -2442,38 +2371,14 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   })
   
   selected_laz <- reactive({
-    cat("input$flight_select_laz:", input$flight_select_laz, "\n")
     if (!is.null(input$flight_select_laz)) {
-      cat("input$laz_folder_check:", input$laz_folder_check, "\n")
-      if (input$laz_folder_check) {
-        # Handle LAZ file upload
-        laz_files <- imgFiles.laz()
-        cat("laz_files:", laz_files, "\n")
-        selected_file <- file.path(normalizePath(uploaded_laz_folder()), input$flight_select_laz)
-        if (file.exists(selected_file)) {
-          return(selected_file)
-        } else {
-          return(NULL)
-        }
-      } else {
-        # Handle LAZ file selection
-        selected_file <- file.path(normalizePath(input$laz_folder), input$flight_select_laz)
-        if (file.exists(selected_file)) {
-          return(selected_file)
-        } else {
-          return(NULL)
-        }
-      }
-    } else {
-      return(NULL)
+      file.path(normalizePath(input$laz_folder), input$flight_select_laz)
     }
   })
   
-
   ## Field area DSM
   imgFiles.dsm_areas <- reactive({
-    if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
-      # Handle selected files
+    if (!is.null(input$dsm_folder_area)) {
       if (dir.exists(input$dsm_folder_area)) {
         files <- list.files(path = input$dsm_folder_area, pattern="*.tif$", full.names = T) #get the PC only 
         # filter out files with "_clip" in the name
@@ -2490,25 +2395,15 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
         print("Invalid tif files folder path!")
         return(NULL)
       }
-    } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
-      # Handle uploaded files
-      files <- input$dsm_upload_area$datapath
-      if (length(files) == 0) {
-        print("No tif files uploaded!")
-        return(NULL)
-      } else {
-        return(files)
-      }
     } else {
-      print("No tif files selected or uploaded!")
+      print("No tif files folder selected!")
       return(NULL)
     }
   })
-    
-
+ 
+  
   dsm_files <- reactive({
-    if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
-      # Handle selected files
+    if (!is.null(input$dsm_folder_area)) {
       if (dir.exists(input$dsm_folder_area)) {
         files <- list.files(path = input$dsm_folder_area, pattern="*.tif$", full.names = T) 
        # files <- files[!grepl("_clip", files)]
@@ -2522,32 +2417,11 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
         print("Invalid tif files folder path!")
         return(NULL)
       }
-    } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
-      # Handle uploaded files
-      files <- input$dsm_upload_area$name
-      if (length(files) == 0) {
-        print("No tif files uploaded!")
-        return(NULL)
-      } else {
-        return(files)
-      }
     } else {
-      print("No tif files selected or uploaded!")
+      print("No tif files folder selected!")
       return(NULL)
     }
-  }) 
-    
-    
-  selected_dsm_file <- reactive({
-    if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
-      # Handle selected files
-      file.path(input$dsm_folder_area, input$nameID)
-    } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
-      # Handle uploaded files
-      input$dsm_upload_area$datapath[input$dsm_upload_area$name == input$nameID]
-    }
   })
-  
   
   observe({
     if (!is.null(dsm_files())) {
@@ -2558,22 +2432,23 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     }
   })
   
-  
   output$file_name <- renderText({
     paste0("Selected File: ", input$nameID)
   })
- 
-  ###############################################################################
-  ## Must to be adjusted yet!!!
-  ############################################################################### 
+  
+  selected_dsm_file <- reactive({
+    if (!is.null(input$nameID)) {
+      file.path(input$dsm_folder_area, input$nameID)
+    }
+  })
+  
   ## Field area PC
   imgFiles.laz_areas.pc <- reactive({
-    if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
-      # Handle selected files
+    if (!is.null(input$laz_folder_area.pc)) {
       if (dir.exists(input$laz_folder_area.pc)) {
         files <- list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) #get the PC only 
         # filter out files with "_clip" in the name
-        # files <- files[!grepl("_clip", files)]
+      #  files <- files[!grepl("_clip", files)]
         print(files)
         if (length(files) == 0) {
           print("No laz files found in the selected folder!")
@@ -2585,27 +2460,17 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
         print("Invalid laz folder path!")
         return(NULL)
       }
-    } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
-      # Handle uploaded files
-      files <- input$laz_folder_area.pc_upload$datapath
-      if (length(files) == 0) {
-        print("No laz files uploaded!")
-        return(NULL)
-      } else {
-        return(files)
-      }
     } else {
-      print("No laz files selected or uploaded!")
+      print("No laz folder selected!")
       return(NULL)
     }
   })
   
-  pc_files <- reactive({
-    if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
-      # Handle selected files
+  dsm_files_pc <- reactive({
+    if (!is.null(input$laz_folder_area.pc)) {
       if (dir.exists(input$laz_folder_area.pc)) {
-        files <- list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) 
-        # files <- files[!grepl("_clip", files)]
+        files <-list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) 
+       # files <- files[!grepl("_clip", files)]
         if (length(files) == 0) {
           print("No laz files found in the selected folder!")
           return(NULL)
@@ -2616,37 +2481,18 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
         print("Invalid laz files folder path!")
         return(NULL)
       }
-    } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
-      # Handle uploaded files
-      files <- input$laz_folder_area.pc_upload$name
-      if (length(files) == 0) {
-        print("No laz files uploaded!")
-        return(NULL)
-      } else {
-        return(files)
-      }
     } else {
-      print("No laz files selected or uploaded!")
+      print("No laz files folder selected!")
       return(NULL)
     }
   })
   
-  selected_pc_file <- reactive({
-    if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
-      # Handle selected files
-      file.path(input$laz_folder_area.pc, input$nameID_pc)
-    } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
-      # Handle uploaded files
-      input$laz_folder_area.pc_upload$datapath[input$laz_folder_area.pc_upload$name == input$nameID_pc]
-    }
-  })
-  
   observe({
-    if (!is.null(pc_files())) {
+    if (!is.null(dsm_files_pc())) {
       updateSelectInput(session, "nameID_pc",
                         label = "Select the File name PC:",
-                        choices = pc_files(),
-                        selected = pc_files()[1])
+                        choices = dsm_files_pc(),
+                        selected = dsm_files_pc()[1])
     }
   })
   
@@ -2657,10 +2503,12 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   })
   
 
-
- 
-###############################################################################
-############################################################################### 
+    selected_pc_file <- reactive({
+    if (!is.null(input$nameID_pc)) {
+      file.path(input$laz_folder_area.pc, input$nameID_pc)
+    }
+  })
+  
   
  ####### Plant Height Estimation (EPH)  ####### 
 
@@ -3179,6 +3027,8 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       setProgress(message = "Initializing view plot figures")
       tryCatch({
         if (input$dsm_single){
+          if (!is.null(input$dsm_folder)) {
+            if (dir.exists(input$dsm_folder)) {
               colorPal <- terrain.colors(255)
               # imgFiles.dtm <-list.files(path = input$dtm_folder, pattern="*.tif$",full.names = T) #get the DTM
               DSM1 <- stack(selected_dsm())
@@ -3217,20 +3067,19 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
               DSM1.c[DSM1.c <= EPH_rem[[1]][[1]]] = NA 
              
               levelplot(DSM1.c[[1]], col.regions = colorPal, margin = FALSE, main = "CSM - Selected plot view")
+              
 
-        } else {
-          dtm_path_plot <- if (input$dtm_folder_check) {
-            normalizePath(uploaded_dtm_folder()) # Use the uploaded DTM folder path
+            } else {
+              stop("DSM folder does not exist.")
+            }
           } else {
-            normalizePath(input$dtm_folder) # Use the selected DTM folder path
+            stop("DSM folder input is NULL.")
           }
-          
-          if (!is.null(dtm_path_plot)) {
-            if (dir.exists(dtm_path_plot)) {
+        } else {
+          if (!is.null(input$dsm_folder)) {
+            if (dir.exists(input$dsm_folder)) {
               colorPal <- terrain.colors(255)
-              
-              imgFiles.dtm <-list.files(path = dtm_path_plot, pattern="*.tif$",full.names = T) #get the DTM
-              
+              imgFiles.dtm <-list.files(path = input$dtm_folder, pattern="*.tif$",full.names = T) #get the DTM
               DSM0 <- stack(imgFiles.dtm)
               DSM1 <- stack(selected_dsm())
               
@@ -3291,19 +3140,18 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
               csm[csm <= EPH_rem[[1]][[1]]] = NA 
               
               levelplot(csm[[1]], col.regions = colorPal, margin = FALSE, main = "CSM - Selected plot view")
-            
-              } else {
+              
+            } else {
               stop("DSM folder does not exist.")
             }
           } else {
             stop("DSM folder input is NULL.")
           }
+          
         }
-        
       }, error = function(e) {
         message("No DSM Plot data available. Please upload a file to perform the CSM.")
         return(NULL)
-      
       })
 
     }) 
@@ -3319,52 +3167,36 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   selected_k2 <- reactiveVal()
   
   imgFiles.laz_veg_pc <- reactive({
-    if (input$laz_folder_check) {
-      # Handle LAZ file upload
-      if (!is.null(input$laz_upload)) {
+    if (!is.null(input$laz_folder)) {
+      if (dir.exists(input$laz_folder)) {
+
         files <- readLAS(files = selected_laz(), select = "xyz")
-        
+
         if (length(files) == 0) {
-          print("No laz files found in the uploaded file!")
-          showNotification("No laz files found in the uploaded file!", type = "error")
+          print("No laz files found in the selected folder!")
+          showNotification("No laz files found in the selected folder!", type = "error")
           return(NULL)
         } else {
           return(files)
         }
       } else {
-        print("No laz files uploaded!")
+        print("Invalid laz folder path!")
         return(NULL)
       }
     } else {
-      # Handle LAZ file selection
-      if (!is.null(input$laz_folder)) {
-        if (dir.exists(input$laz_folder)) {
-          files <- readLAS(files = selected_laz(), select = "xyz")
-          
-          if (length(files) == 0) {
-            print("No laz files found in the selected folder!")
-            showNotification("No laz files found in the selected folder!", type = "error")
-            return(NULL)
-          } else {
-            return(files)
-          }
-        } else {
-          print("Invalid laz folder path!")
-          return(NULL)
-        }
-      } else {
-        print("No laz folder selected!")
-        return(NULL)
-      }
+      print("No laz folder selected!")
+      return(NULL)
     }
   })
-  
   
   # Render vegetation plot - Point Cloud
   output$PlotLaz_ind <- renderPlot({
     withProgress(message = "Running Time Series Data method", {
       setProgress(message = "Initializing view plot figures")
     tryCatch({
+      if (!is.null(input$laz_folder)) {
+        if (dir.exists(input$laz_folder)) {
+        
           cloud <- imgFiles.laz_veg_pc()
           shape <- indPlots_2()
           
@@ -3407,7 +3239,12 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
 
           output$PlotLaz_ind_file <- renderText(paste0("Point cloud figure ID: ", indPlots_col()$PlotID_sel[k]))
           
-
+          } else {
+          stop("Point cloud folder does not exist.")
+        }
+      } else {
+        stop("Point cloud folder input is NULL.")
+      }
     }, error = function(e) {
       message("No Point cloud Plot data available. Please upload a file.")
       output$PlotLaz_ind_file <- renderText(paste0("Point Cloud visualization - Select analysis method: Ind. Data Flight"))
@@ -3424,6 +3261,9 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     withProgress(message = "Running Time Series Data method", {
       setProgress(message = "Initializing view plot figures")
     tryCatch({
+      if (!is.null(input$laz_folder)) {
+        if (dir.exists(input$laz_folder)) {
+          
           cloud <- imgFiles.laz_veg_pc()
           k <- selected_k2() 
           p <- indPlots_2()[k,]
@@ -3463,6 +3303,12 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
           
           output$PlotLaz_ind_file2 <- renderText(paste0("Point cloud figure ID: ", indPlots_col()$PlotID_sel[k]))
           
+        } else {
+          stop("Point cloud folder does not exist.")
+        }
+      } else {
+        stop("Point cloud folder input is NULL.")
+      }
     }, error = function(e) {
       message("No Point cloud plot data available. Please upload a file.")
       #output$PlotLaz_ind_file2 <- renderText(paste0("Point cloud figure"))
@@ -3476,12 +3322,9 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   ### PC soil
   
   imgFiles.laz_soil_pc <- reactive({
-    if (input$laz_folder_check) {
-      # Handle LAZ file upload
-      if (!is.null(input$laz_upload_soil)) {
-        
-        uploaded_files <- unique(dirname(unlist(input$laz_upload_soil$datapath)))
-        files <- list.files(uploaded_files, pattern = "*.laz$", full.names = TRUE)
+    if (!is.null(input$laz_folder.soil)) {
+      if (dir.exists(input$laz_folder.soil)) {
+        files <- list.files(path = input$laz_folder.soil, pattern="*.laz$",full.names = T) #get the DTM
         
         if (length(files) > 1) {
           stop("Only one Soil Point Cloud should be uploaded")
@@ -3490,54 +3333,30 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
         } else {
           cloud_s <- readLAS(files = files, select = "xyz")
         }
-        
+
         if (length(files) == 0) {
-          print("No LAZ files uploaded!")
+          print("No laz files found in the selected folder!")
           return(NULL)
         } else {
           return(cloud_s)
         }
       } else {
-        print("No LAZ files uploaded!")
+        print("Invalid laz folder path!")
         return(NULL)
       }
     } else {
-      # Handle LAZ file selection
-      if (!is.null(input$laz_folder.soil)) {
-        if (dir.exists(input$laz_folder.soil)) {
-          files <- list.files(path = input$laz_folder.soil, pattern="*.laz$",full.names = T) #get the DTM
-          
-          if (length(files) > 1) {
-            stop("Only one Soil Point Cloud should be uploaded")
-            showNotification("Only one Soil Point Cloud should be uploaded", type = "error")
-            return(NULL)
-          } else {
-            cloud_s <- readLAS(files = files, select = "xyz")
-          }
-          
-          if (length(files) == 0) {
-            print("No laz files found in the selected folder!")
-            return(NULL)
-          } else {
-            return(cloud_s)
-          }
-        } else {
-          print("Invalid laz folder path!")
-          return(NULL)
-        }
-      } else {
-        print("No laz folder selected!")
-        return(NULL)
-      }
+      print("No laz folder selected!")
+      return(NULL)
     }
   })
-  
   
   # Render ind plot - PC
   output$PlotLaz_ind_s <- renderPlot({
     withProgress(message = "Running Time Series Data method", {
       setProgress(message = "Initializing view plot figures")
       tryCatch({
+        if (!is.null(input$laz_folder.soil)) {
+          if (dir.exists(input$laz_folder.soil)) {
             
             cloud_s <- imgFiles.laz_soil_pc()
             
@@ -3575,6 +3394,12 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
             
             output$PlotLaz_ind_file_s <- renderText(paste0("Point cloud figure ID: ", indPlots_col()$PlotID_sel[k]))
             
+          } else {
+            stop("Point cloud folder does not exist.")
+          }
+        } else {
+          stop("Point cloud folder input is NULL.")
+        }
       }, error = function(e) {
         message("No Point cloud Plot data available. Please upload a file.")
         #output$rasterPlotDSM_file_ind2 <- renderText(paste0("Point cloud figure"))
@@ -3591,6 +3416,8 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     withProgress(message = "Running Time Series Data method", {
       setProgress(message = "Initializing view plot figures")
       tryCatch({
+        if (!is.null(input$laz_folder.soil)) {
+          if (dir.exists(input$laz_folder.soil)) {
             
             cloud_s <- imgFiles.laz_soil_pc()
 
@@ -3634,6 +3461,12 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
             
             output$PlotLaz_ind_file2_s <- renderText(paste0("Point cloud figure ID: ", indPlots_col()$PlotID_sel[k]))
             
+          } else {
+            stop("Point cloud folder does not exist.")
+          }
+        } else {
+          stop("Point cloud folder input is NULL.")
+        }
       }, error = function(e) {
         message("No Point cloud Plot data available. Please upload a file.")
         #output$rasterPlotDSM_file_ind2 <- renderText(paste0("Point cloud figure"))
@@ -3643,79 +3476,61 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     }) 
   })
      
-##############################################################
-######Need to adjust from here ################################## 
-##############################################################
+
   ## Load the shapefile files - Field area DSM
   selected_shapefile_path <- reactiveVal(NULL)
   
-  observeEvent(c(input$shapefile_button_clip.dsm, input$shapefile_button_clip.dsm_upload), {
-    if (input$dsm_folder_check_area) {
-      # Handle uploaded shapefiles
-      zip_path <- input$shapefile_button_clip.dsm_upload$datapath[1]
-      if (!is.null(zip_path) && endsWith(zip_path, ".zip")) {
-        temp_dir <- tempdir()
-        unzip(zip_path, exdir = temp_dir)
-        shapefile_path_clip <- list.files(temp_dir, pattern = "\\.shp$", full.names = TRUE)[1]
-      } else {
-        shapefile_path_clip <- NULL
+  
+  observeEvent(input$shapefile_button_clip.dsm, {
+    shapefile_path_clip <- tryCatch(file.choose(),
+                                    error = function(e) NULL)
+    if (!is.null(shapefile_path_clip)) {
+      if (endsWith(shapefile_path_clip, ".shp")) {
+        shapefile_path_clip_global.dsm<<- shapefile_path_clip
+        shapefile_name_clip.dsm <- basename(shapefile_path_clip)
+        indPlots_clip <- st_read(shapefile_path_clip)
+        output$contents_shape2 <- DT::renderDataTable(DT::datatable(indPlots_clip, options = list(pageLength = 5, scrollX = T)))
+        # set the value of the reactive variable
+        selected_shapefile_path(shapefile_path_clip)
+        
+        } else {
+        output$shapefile_name_clip.dsm <- renderText("Invalid file type! Please select a shapefile (.shp).")
       }
     } else {
-      # Handle selected shapefiles
-      shapefile_path_clip <- tryCatch(file.choose(), error = function(e) NULL)
+      output$shapefile_name_clip.dsm <- renderText("Invalid shapefile file path!\n")
     }
-    
-    if (!is.null(shapefile_path_clip) && endsWith(shapefile_path_clip, ".shp")) {
-      shapefile_path_clip_global.dsm <<- shapefile_path_clip
-      shapefile_name_clip.dsm <- basename(shapefile_path_clip)
-      indPlots_clip <- st_read(shapefile_path_clip)
-      output$contents_shape2 <- DT::renderDataTable(DT::datatable(indPlots_clip, options = list(pageLength = 5, scrollX = T)))
-      selected_shapefile_path(shapefile_path_clip)
-    } else {
-      output$shapefile_name_clip.dsm <- renderText("Invalid file type! Please select a shapefile (.shp).")
-    }
-  }, ignoreInit = TRUE)
+  }, ignoreInit = TRUE)   
   
   
-  ## Load the shapefile files - Field area PC
-  selected_shapefile_path_pc <- reactiveVal(NULL)
-  
-  observeEvent(c(input$shapefile_button_clip.pc, input$shapefile_button_clip.pc_upload), {
-    if (input$laz_folder_check_area) {
-      # Handle uploaded shapefiles
-      zip_path <- input$shapefile_button_clip.pc_upload$datapath[1]
-      if (!is.null(zip_path) && endsWith(zip_path, ".zip")) {
-        temp_dir <- tempdir()
-        unzip(zip_path, exdir = temp_dir)
-        shapefile_path_clip <- list.files(temp_dir, pattern = "\\.shp$", full.names = TRUE)[1]
-      } else {
-        shapefile_path_clip <- NULL
-      }
-    } else {
-      # Handle selected shapefiles
-      shapefile_path_clip <- tryCatch(file.choose(), error = function(e) NULL)
-    }
-    
-    if (!is.null(shapefile_path_clip) && endsWith(shapefile_path_clip, ".shp")) {
+## Load the shapefile files - Field area DSM
+selected_shapefile_path_pc <- reactiveVal(NULL)
+
+## Load the shapefile files - Field area PC
+observeEvent(input$shapefile_button_clip.pc, {
+  shapefile_path_clip <- tryCatch(file.choose(),
+                             error = function(e) NULL)
+  if (!is.null(shapefile_path_clip)) {
+    if (endsWith(shapefile_path_clip, ".shp")) {
       shapefile_path_clip_global<<- shapefile_path_clip
       shapefile_name_clip.pc <- basename(shapefile_path_clip)
       indPlots_clip <- st_read(shapefile_path_clip)
       output$contents_shape3 <- DT::renderDataTable(DT::datatable(indPlots_clip, options = list(pageLength = 5, scrollX = T)))
       selected_shapefile_path_pc(shapefile_path_clip)
-    } else {
+      } else {
       output$shapefile_name_clip.pc <- renderText("Invalid file type! Please select a shapefile (.shp).")
     }
-  }, ignoreInit = TRUE)
-  
+  } else {
+    output$shapefile_name_clip.pc <- renderText("Invalid shapefile file path!\n")
+  }
+}, ignoreInit = TRUE)   
   
 
-## Load the DSM files - field area DSM
-observeEvent(list(input$dsm_folder_area, input$dsm_upload_area), {
-  if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
-    # Handle selected files
+## Load the PC files - field area DSM
+observeEvent(input$dsm_folder_area, {
+  if (!is.null(input$dsm_folder_area)) {
     if (dir.exists(input$dsm_folder_area)) {
       dsm_folder_name_area <- basename(input$dsm_folder_area)
-      imgFiles.dsm_area <- list.files(path = input$dsm_folder_area, pattern="*.tif$", full.names = T)
+      imgFiles.dsm_area <-list.files(path = input$dsm_folder_area, pattern="*.tif$",full.names = T) #get the laz only 
       imgFiles.dsm_area <- sapply(imgFiles.dsm_area, function(x) gsub(".tif", "", basename(x)))
       cat("Selected DSM vegetation folder:", dsm_folder_name_area, "\n")
       output$dsm_folder_name_area <- renderText(paste0("Selected DSM folder name: ", dsm_folder_name_area, "\n"))
@@ -3725,26 +3540,16 @@ observeEvent(list(input$dsm_folder_area, input$dsm_upload_area), {
       output$dsm_folder_name_area <- renderText("Invalid DSM vegetation folder path!")
       output$imgFiles.dsm_area <- renderText("Invalid DSM vegetation files path!")
     }
-  } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
-    # Handle uploaded files
-    dsm_folder_name_area <- "Uploaded Files"
-    imgFiles.dsm_area <- input$dsm_upload_area$name
-    imgFiles.dsm_area <- sapply(imgFiles.dsm_area, function(x) gsub(".tif", "", x))
-    cat("Selected DSM vegetation folder:", dsm_folder_name_area, "\n")
-    output$dsm_folder_name_area <- renderText(paste0("Selected DSM folder name: ", dsm_folder_name_area, "\n"))
-    output$imgFiles.dsm_area <- renderText(paste0("Selected DSM files: ", imgFiles.dsm_area, "\n"))
   }
 }, ignoreInit = TRUE)
 
 
-
 ## Load the PC files - field area PC
-observeEvent(list(input$laz_folder_area.pc, input$laz_folder_area.pc_upload), {
-  if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
-    # Handle selected files
+observeEvent(input$laz_folder_area.pc, {
+  if (!is.null(input$laz_folder_area.pc)) {
     if (dir.exists(input$laz_folder_area.pc)) {
       laz_folder_name_area <- basename(input$laz_folder_area.pc)
-      imgFiles.laz_area.pc <- list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) #get the laz only 
+      imgFiles.laz_area.pc <-list.files(path = input$laz_folder_area.pc, pattern="*.laz$",full.names = T) #get the laz only 
       imgFiles.laz_area.pc <- sapply(imgFiles.laz_area.pc, function(x) gsub(".laz", "", basename(x)))
       cat("Selected LAZ vegetation folder:", laz_folder_name_area, "\n")
       output$laz_folder_name_area <- renderText(paste0("Selected LAZ field area: ", laz_folder_name_area, "\n"))
@@ -3754,17 +3559,8 @@ observeEvent(list(input$laz_folder_area.pc, input$laz_folder_area.pc_upload), {
       output$laz_folder_name_area <- renderText("Invalid LAZ vegetation folder path!")
       output$imgFiles.laz_area.pc <- renderText("Invalid LAZ vegetation files path!")
     }
-  } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
-    # Handle uploaded files
-    laz_folder_name_area <- "Uploaded Files"
-    imgFiles.laz_area.pc <- input$laz_folder_area.pc_upload$name
-    imgFiles.laz_area.pc <- sapply(imgFiles.laz_area.pc, function(x) gsub(".laz", "", x))
-    cat("Selected LAZ vegetation folder:", laz_folder_name_area, "\n")
-    output$laz_folder_name_area <- renderText(paste0("Selected LAZ field area: ", laz_folder_name_area, "\n"))
-    output$imgFiles.laz_area.pc <- renderText(paste0("Selected LAZ files: ", imgFiles.laz_area.pc, "\n"))
   }
 }, ignoreInit = TRUE)
-
 
 
 ## Shapefile to use in the loop to Clipping Point Cloud
@@ -3840,6 +3636,8 @@ output$PlotLaz_ind_3d <- renderRglwidget({
   withProgress(message = "Running Time Series Data method", {
     setProgress(message = "Initializing view plot figures")
     tryCatch({
+      if (!is.null(input$laz_folder)) {
+        if (dir.exists(input$laz_folder)) {
 
           cloud <- imgFiles.laz_veg_pc()
           
@@ -3872,6 +3670,12 @@ output$PlotLaz_ind_3d <- renderRglwidget({
 
           #output$PlotLaz_ind_file_3d <- renderText(paste0("Point cloud figure 3D ID: ", indPlots_col()$PlotID_sel[k]))
 
+        } else {
+          stop("Point cloud folder does not exist.")
+        }
+      } else {
+        stop("Point cloud folder input is NULL.")
+      }
     }, error = function(e) {
       message("3D - No Point cloud Plot data available. Please upload a file.")
        return(NULL)
@@ -3886,37 +3690,35 @@ output$rasterPlotDSM_area <- renderPlot({
   withProgress(message = "Running Time Series Data method", {
     setProgress(message = "Initializing view plot figures")
     tryCatch({
-      if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
-        # Handle selected files
+      if(!is.null(input$dsm_folder_area)) {
         if (dir.exists(input$dsm_folder_area)) {
+          
           DSM_filename <- selected_dsm_file()
+          message("names files selected:")
+          print(DSM_filename)
+          # Read the selected DSM file
+          DSM1 <- raster::stack(DSM_filename)
+            
+          if (!is.null(selected_shapefile_path())) {
+            shape <- sf::st_read(selected_shapefile_path())
+            overlay_data(DSM1, shape)
+            crs.result <- shp_test_crs(DSM1, shape)
+            DSM1 <- crs.result$data
+            shape <- crs.result$shp
+            plot(DSM1, xlab="", ylab="")
+            plot(shape, add = TRUE, col = "red")
+            
+          } else {
+            plot(DSM1, xlab="", ylab="")
+          }
+          
+
         } else {
           stop("DSM folder does not exist.")
         }
-      } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
-        # Handle uploaded files
-        DSM_filename <- selected_dsm_file()
       } else {
         stop("DSM folder input is NULL.")
       }
-      
-      message("names files selected:")
-      print(DSM_filename)
-      # Read the selected DSM file
-      DSM1 <- raster::stack(DSM_filename)
-      
-      if (!is.null(selected_shapefile_path())) {
-        shape <- sf::st_read(selected_shapefile_path())
-        overlay_data(DSM1, shape)
-        crs.result <- shp_test_crs(DSM1, shape)
-        DSM1 <- crs.result$data
-        shape <- crs.result$shp
-        plot(DSM1, xlab="", ylab="")
-        plot(shape, add = TRUE, col = "red")
-      } else {
-        plot(DSM1, xlab="", ylab="")
-      }
-      
     }, error = function(e) {
       message("No DSM data available. Please upload a file.")
       showNotification(paste("No DSM Plot data available. Please upload a file."), type = "error")
@@ -3925,53 +3727,48 @@ output$rasterPlotDSM_area <- renderPlot({
 })
 
 
-
 ## Plot area PC
 
 output$rasterPlotPC_area <- renderPlot({
   withProgress(message = "Running Time Series Data method", {
     setProgress(message = "Initializing view plot figures")
     tryCatch({
-      if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
-        # Handle selected files
+      if (!is.null(input$laz_folder_area.pc)) {
         if (dir.exists(input$laz_folder_area.pc)) {
+          
           PC_filename <- selected_pc_file()
+          message("names files selected:")
+          print(PC_filename)
+          
+          cloud_s <- readLAS(files = PC_filename, select = "xyz")
+          # Select points randomly to reach an homogeneous density of 1
+          cloud_s <- decimate_points(cloud_s, homogenize(1,5))
+          
+          # Remove outliers in c_veg using IQR
+          Q1_soil <- quantile(cloud_s@data$Z, 0.25, na.rm=TRUE)
+          Q3_soil <- quantile(cloud_s@data$Z, 0.75, na.rm=TRUE)
+          IQR_soil <- Q3_soil - Q1_soil
+          kout <- 1.5
+          cloud_s <- cloud_s[cloud_s@data$Z >= Q1_soil - kout * IQR_soil & cloud_s@data$Z <= Q3_soil + kout * IQR_soil,]
+          
+          if (!is.null(selected_shapefile_path_pc())) {
+            shape <- sf::st_read(selected_shapefile_path_pc())
+            crs.result <- shp_test_crs_pc(cloud_s, shape)
+            cloud_s <- crs.result$data
+            shape <- crs.result$shp
+            plot(cloud_s@data$X, cloud_s@data$Y, xlab="", ylab="", main = "Nadir view - Point cloud distribution")
+            plot(shape, add = TRUE, col = "red")
+            
+          } else {
+            plot(cloud_s@data$X, cloud_s@data$Y, xlab="", ylab="", main = "Nadir view - Point cloud distribution")
+          }
+          
         } else {
           stop("Point cloud folder does not exist.")
         }
-      } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
-        # Handle uploaded files
-        PC_filename <- selected_pc_file()
       } else {
         stop("Point cloud folder input is NULL.")
       }
-      
-      message("names files selected:")
-      print(PC_filename)
-      
-      cloud_s <- readLAS(files = PC_filename, select = "xyz")
-      # Select points randomly to reach an homogeneous density of 1
-      cloud_s <- decimate_points(cloud_s, homogenize(1,5))
-      
-      # Remove outliers in c_veg using IQR
-      Q1_soil <- quantile(cloud_s@data$Z, 0.25, na.rm=TRUE)
-      Q3_soil <- quantile(cloud_s@data$Z, 0.75, na.rm=TRUE)
-      IQR_soil <- Q3_soil - Q1_soil
-      kout <- 1.5
-      cloud_s <- cloud_s[cloud_s@data$Z >= Q1_soil - kout * IQR_soil & cloud_s@data$Z <= Q3_soil + kout * IQR_soil,]
-      
-      if (!is.null(selected_shapefile_path_pc())) {
-        shape <- sf::st_read(selected_shapefile_path_pc())
-        crs.result <- shp_test_crs_pc(cloud_s, shape)
-        cloud_s <- crs.result$data
-        shape <- crs.result$shp
-        plot(cloud_s@data$X, cloud_s@data$Y, xlab="", ylab="", main = "Nadir view - Point cloud distribution")
-        plot(shape, add = TRUE, col = "red")
-        
-      } else {
-        plot(cloud_s@data$X, cloud_s@data$Y, xlab="", ylab="", main = "Nadir view - Point cloud distribution")
-      }
-      
     }, error = function(e) {
       message("No Point cloud Plot data available. Please upload a file.")
       showNotification(paste("No LAZ soil plot data available. Please upload a file."), type = "error")
@@ -3979,8 +3776,7 @@ output$rasterPlotPC_area <- renderPlot({
       return(NULL)
     })
   }) 
-})
-
+}) 
 
 
 output$showWarning <- reactive({
