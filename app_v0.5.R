@@ -11,6 +11,7 @@ library("shinydashboard")
 library("dashboardthemes")
 library("shinyjs")
 library("rgl") 
+#install.packages("glue")
 
 library("data.table") 
 library("DT") 
@@ -82,6 +83,7 @@ disclosure_tab <- tabItem(
 clip_tab <- tabItem(
   tabName = "ClipIMG",
   fluidPage(
+    useShinyjs(), # enable the use of ShinyJS 
     titlePanel("Cropping image"),
     h4("Reducing ohomosaic or Point cloud data by the field polygon shapefile"),
     mainPanel(
@@ -140,6 +142,14 @@ clip_tab <- tabItem(
                   actionButton("Clip_DSM", "RUN DSM snipping"),
                   h4("Snipping DSM using field shp area and saving to folder"),
                   
+                  br(),
+                  
+                  conditionalPanel(
+                    condition = "input.dsm_folder_check_area == true",
+                  actionButton("open_folder_dsm", "Open Folder", class = "btn btn-primary", disabled = TRUE)
+                  )
+                  
+                  
          ),
          
          tabPanel("Point Cloud",
@@ -193,7 +203,12 @@ clip_tab <- tabItem(
                   br(),
                   
                   actionButton("Clip_PC", "RUN Point Cloud snipping"),
-                  h4("Snipping Point Cloud using field shp area and saving to folder")
+                  h4("Snipping Point Cloud using field shp area and saving to folder"),
+                  
+                  conditionalPanel(
+                    condition = "input.laz_folder_check_area == true",
+                    actionButton("open_folder_laz", "Open Folder", class = "btn btn-primary", disabled = TRUE)
+                  )
          )
       )
       ),
@@ -225,6 +240,7 @@ clip_tab <- tabItem(
     upload_tab <- tabItem(
       tabName = "FileUpload",
       fluidPage(
+        useShinyjs(), # enable the use of ShinyJS 
         titlePanel("Phenotyping dataset"),
         mainPanel(
           tabsetPanel(
@@ -1243,21 +1259,23 @@ clipper.area.dsm <- function(dsm_list, shape, n.core) {
   
   if (length(dsm_list) == 0) {
     showNotification("No DSM files provided", type = "error")
-    return(list())
+    return(character(0))
+    
   }
   
   for(c in 1:length(dsm_list)){ 
-
+    
     DSM <- stack(dsm_list[c])
     overlay_data(DSM, shape)
   }
-    
+  
   # filter out files with "_clip" in the name
- # dsm_list <- dsm_list[!grepl("_clip", dsm_list)]
+  # dsm_list <- dsm_list[!grepl("_clip", dsm_list)]
   
   cl <- makeCluster(n.core, output = "")
   registerDoParallel(cl)
-  getDoParWorkers()
+  getDoParWorkers() 
+  
   
   tryCatch(
     foreach(i = 1:length(dsm_list), 
@@ -1286,15 +1304,19 @@ clipper.area.dsm <- function(dsm_list, shape, n.core) {
               } else if(!isTRUE(sf::st_crs(shape) == sf::st_crs(DSM))) {
                 stop("The CRS for DSM must be the same as the CRS for shapefiles")
               }
-
+              
               # clip the point cloud by the polygon shapefile
               DSM.c <-  crop(DSM, st_bbox(shape))
               
               # save the clipped point cloud to a new DSM file
               DSM.c_names <- sapply(dsm_list[i], function(x) gsub(".tif", "", x))
-              writeRaster(DSM.c, paste0(DSM.c_names,"_clip.tif"), format = "GTiff")
+              #writeRaster(DSM.c, paste0(DSM.c_names,"_clip.tif"), format = "GTiff", overwrite=TRUE)
               
-              DSM.c
+              clipped_dsm_path <- paste0(DSM.c_names, "_clip.tif")
+              
+              writeRaster(DSM.c, clipped_dsm_path, format = "GTiff", overwrite=TRUE)
+              clipped_dsm_path
+              
             },
     error = function(e) {
       showNotification(paste("Error in clipper.area.dsm:", e), type = "error")
@@ -2108,10 +2130,27 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     }
   }, ignoreInit = TRUE)
   
-  
 
+   
+  clippedDSMPath <- reactiveVal(NULL)
+  # Create a temporary directory
+  temp_dir <- tempfile()
+  dir.create(temp_dir)
+  # Update clippedDSMPath reactive value with the new temporary directory
+  clippedDSMPath(temp_dir)
+  
+  clippedLazPath <- reactiveVal(NULL)
+  # Create a temporary directory
+  temp_dir_laz <- tempfile()
+  dir.create(temp_dir_laz)
+  
+  # Update clippedLazPath reactive value with the new temporary directory
+  clippedLazPath(temp_dir_laz)
+  
+  
   ## Load the shapefile files
   shapefile_path_global <- reactiveVal(NULL)
+  
   
   observeEvent(list(input$shapefile_button, input$shapefile_upload), {
     shapefile_path <- NULL
@@ -2124,7 +2163,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     if (input$shapefile_upload_check) {
       # Handle shapefile file upload
       if (!is.null(input$shapefile_upload)) {
-        temp_dir <- tempdir()
+        #temp_dir <- tempdir()
         unzip(input$shapefile_upload$datapath, exdir = temp_dir)
         shp_files <- list.files(temp_dir, pattern = "*.shp$", full.names = TRUE)
         
@@ -2476,8 +2515,6 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       # Handle selected files
       if (dir.exists(input$dsm_folder_area)) {
         files <- list.files(path = input$dsm_folder_area, pattern="*.tif$", full.names = T) #get the PC only 
-        # filter out files with "_clip" in the name
-       # files <- files[!grepl("_clip", files)]
         message("Print file names")
         print(files)
         if (length(files) == 0) {
@@ -2492,18 +2529,27 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       }
     } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
       # Handle uploaded files
-      files <- input$dsm_upload_area$datapath
-      if (length(files) == 0) {
+      uploaded_files <- input$dsm_upload_area$datapath
+      uploaded_file_names <- input$dsm_upload_area$name # Get the original file names
+      message("Print file names")
+      print(uploaded_files)
+      
+      # Save the uploaded TIF files in temp_dir with their original file names
+      temp_files <- file.path(temp_dir, uploaded_file_names)
+      file.copy(uploaded_files, temp_files, overwrite = TRUE)
+      
+      if (length(temp_files) == 0) {
         print("No tif files uploaded!")
         return(NULL)
       } else {
-        return(files)
+        return(temp_files)
       }
     } else {
       print("No tif files selected or uploaded!")
       return(NULL)
     }
   })
+  
     
 
   dsm_files <- reactive({
@@ -2563,17 +2609,13 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     paste0("Selected File: ", input$nameID)
   })
  
-  ###############################################################################
-  ## Must to be adjusted yet!!!
-  ############################################################################### 
   ## Field area PC
   imgFiles.laz_areas.pc <- reactive({
     if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
       # Handle selected files
       if (dir.exists(input$laz_folder_area.pc)) {
         files <- list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) #get the PC only 
-        # filter out files with "_clip" in the name
-        # files <- files[!grepl("_clip", files)]
+        message("Print file names")
         print(files)
         if (length(files) == 0) {
           print("No laz files found in the selected folder!")
@@ -2587,18 +2629,27 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       }
     } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
       # Handle uploaded files
-      files <- input$laz_folder_area.pc_upload$datapath
-      if (length(files) == 0) {
+      uploaded_files <- input$laz_folder_area.pc_upload$datapath
+      uploaded_file_names <- input$laz_folder_area.pc_upload$name # Get the original file names
+      message("Print file names")
+      print(uploaded_files)
+      
+      # Save the uploaded LAZ files in temp_dir_laz with their original file names
+      temp_files <- file.path(temp_dir_laz, uploaded_file_names)
+      file.copy(uploaded_files, temp_files, overwrite = TRUE)
+      
+      if (length(temp_files) == 0) {
         print("No laz files uploaded!")
         return(NULL)
       } else {
-        return(files)
+        return(temp_files)
       }
     } else {
       print("No laz files selected or uploaded!")
       return(NULL)
     }
   })
+  
   
   pc_files <- reactive({
     if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
@@ -2657,9 +2708,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   })
   
 
-
- 
-###############################################################################
+ ###############################################################################
 ############################################################################### 
   
  ####### Plant Height Estimation (EPH)  ####### 
@@ -3054,7 +3103,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     
   })
   
-
+ 
   ## DTM
   # Render plot
   output$rasterPlotDTM <- renderPlot({
@@ -3643,9 +3692,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
     }) 
   })
      
-##############################################################
-######Need to adjust from here ################################## 
-##############################################################
+
   ## Load the shapefile files - Field area DSM
   selected_shapefile_path <- reactiveVal(NULL)
   
@@ -3654,7 +3701,6 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       # Handle uploaded shapefiles
       zip_path <- input$shapefile_button_clip.dsm_upload$datapath[1]
       if (!is.null(zip_path) && endsWith(zip_path, ".zip")) {
-        temp_dir <- tempdir()
         unzip(zip_path, exdir = temp_dir)
         shapefile_path_clip <- list.files(temp_dir, pattern = "\\.shp$", full.names = TRUE)[1]
       } else {
@@ -3685,7 +3731,6 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       # Handle uploaded shapefiles
       zip_path <- input$shapefile_button_clip.pc_upload$datapath[1]
       if (!is.null(zip_path) && endsWith(zip_path, ".zip")) {
-        temp_dir <- tempdir()
         unzip(zip_path, exdir = temp_dir)
         shapefile_path_clip <- list.files(temp_dir, pattern = "\\.shp$", full.names = TRUE)[1]
       } else {
@@ -3708,7 +3753,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   }, ignoreInit = TRUE)
   
   
-
+  imgFiles.dsm_area_names <- reactiveVal(NULL)
 ## Load the DSM files - field area DSM
 observeEvent(list(input$dsm_folder_area, input$dsm_upload_area), {
   if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
@@ -3730,6 +3775,7 @@ observeEvent(list(input$dsm_folder_area, input$dsm_upload_area), {
     dsm_folder_name_area <- "Uploaded Files"
     imgFiles.dsm_area <- input$dsm_upload_area$name
     imgFiles.dsm_area <- sapply(imgFiles.dsm_area, function(x) gsub(".tif", "", x))
+    imgFiles.dsm_area_names(imgFiles.dsm_area)
     cat("Selected DSM vegetation folder:", dsm_folder_name_area, "\n")
     output$dsm_folder_name_area <- renderText(paste0("Selected DSM folder name: ", dsm_folder_name_area, "\n"))
     output$imgFiles.dsm_area <- renderText(paste0("Selected DSM files: ", imgFiles.dsm_area, "\n"))
@@ -3787,6 +3833,9 @@ indPlots_3_area <- reactive({
 
 
 ### Clipping DSM
+
+clipped_dsm_paths_rv <- reactiveValues(clipped_dsm_paths = NULL)
+
 img_area.dsm <- reactive({
   if(is.null(input$dsm_folder_area)) {return("No data found")}
   
@@ -3799,11 +3848,46 @@ img_area.dsm <- reactive({
       n.core=n.core3()
     )
     
+    # Update the clipped_dsm_paths reactive value
+    clipped_dsm_paths_rv$clipped_dsm_paths <- clippedDSMPath()
+    
+    cat("clipped_dsm_paths:", clippedDSMPath(), "\n")
+
   })
 })
 
 
+observe({
+  # Check if the folder path is available
+  folder_path_available <- !is.null(clipped_dsm_paths_rv$clipped_dsm_paths)
+  
+  # Enable/disable the button based on the folder path's availability
+  if (folder_path_available) {
+    shinyjs::enable("open_folder_dsm")
+  } else {
+    shinyjs::disable("open_folder_dsm")
+  }
+})
+
+observeEvent(input$open_folder_dsm, {
+  # Get the clipped_dsm_paths from the reactive value
+  clipped_dsm_paths <- clipped_dsm_paths_rv$clipped_dsm_paths
+  
+  if (!is.null(clipped_dsm_paths)) {
+    # Open the folder containing the temporary files
+    folder_path <- clipped_dsm_paths[1]
+    browseURL(folder_path)
+  } else {
+    # Show a message if the folder path is not available
+    showNotification("Folder path not available", type = "error")
+  }
+})
+
+
 ### Clipping Point Cloud 
+# Add a reactive value to store the clipped_laz_paths
+clipped_laz_paths_rv <- reactiveValues(clipped_laz_paths = NULL)
+
 img_laz_area.pc <- reactive({
   if(is.null(input$laz_folder_area.pc)) {return("No data found")}
   
@@ -3816,7 +3900,38 @@ img_laz_area.pc <- reactive({
       n.core=n.core2()
     )
     
+    # Update the clipped_laz_paths reactive value
+    clipped_laz_paths_rv$clipped_laz_paths <- clippedLazPath()
+    
+    cat("clipped_laz_paths:", clippedLazPath(), "\n")
   })
+})
+
+
+observe({
+  # Check if the folder path is available
+  folder_path_available <- !is.null(clipped_laz_paths_rv$clipped_laz_paths)
+  
+  # Enable/disable the button based on the folder path's availability
+  if (folder_path_available) {
+    shinyjs::enable("open_folder_laz")
+  } else {
+    shinyjs::disable("open_folder_laz")
+  }
+})
+
+observeEvent(input$open_folder_laz, {
+  # Get the clipped_laz_paths from the reactive value
+  clipped_laz_paths <- clipped_laz_paths_rv$clipped_laz_paths
+  
+  if (!is.null(clipped_laz_paths)) {
+    # Open the folder containing the temporary files
+    folder_path <- clipped_laz_paths[1]
+    browseURL(folder_path)
+  } else {
+    # Show a message if the folder path is not available
+    showNotification("Folder path not available", type = "error")
+  }
 })
 
 
@@ -3826,6 +3941,8 @@ observeEvent(input$Clip_DSM, {
   if(is.null(input$dsm_folder_area)) {return("No data found")}
   img_area.dsm()
 })
+
+
 
 ## Clip point cloud function
 observeEvent(input$Clip_PC, {
