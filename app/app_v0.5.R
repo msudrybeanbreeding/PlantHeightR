@@ -140,7 +140,10 @@ clip_tab <- tabItem(
                   br(),
 
                   actionButton("Clip_DSM", "RUN DSM snipping"),
-                  h4("Snipping DSM using field shp area and saving to folder"),
+                  
+                  br(),
+                  br(),
+                  textOutput("folder_name_dsm"),
                   
                   br(),
                   
@@ -204,7 +207,10 @@ clip_tab <- tabItem(
                   br(),
                   
                   actionButton("Clip_PC", "RUN Point Cloud snipping"),
-                  h4("Snipping Point Cloud using field shp area and saving to folder"),
+                  
+                  br(),
+                  br(),
+                  textOutput("folder_name_pc"),
                   
                   conditionalPanel(
                     condition = "input.laz_folder_check_area == true",
@@ -2645,6 +2651,47 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
   
   output$file_name <- renderText({
     paste0("Selected File: ", input$nameID)
+  })
+  
+  ### DSM destination folder name
+  selected_folder_name_dsm <- reactive({
+    if (!is.null(input$dsm_folder_area) && !input$dsm_folder_check_area) {
+      files <- list.files(path = input$dsm_folder_area, pattern="*.tif$", full.names = T) 
+      dir_name <- dirname(files[1])
+      return(dir_name)
+      
+    } else if (!is.null(input$dsm_upload_area) && input$dsm_folder_check_area) {
+      clippedDSMPath()
+      
+    } else {
+      print("Invalid DSM path!")
+      return(NULL)
+    }
+  })
+  
+  output$folder_name_dsm <- renderText({
+    paste0("Destination folder: ", selected_folder_name_dsm())
+  })
+  
+  ### PC destination folder name
+  selected_folder_name_pc <- reactive({
+    if (!is.null(input$laz_folder_area.pc) && !input$laz_folder_check_area) {
+      files <- list.files(path = input$laz_folder_area.pc, pattern="*.laz$", full.names = T) 
+      dir_name <- dirname(files[1])
+      return(dir_name)
+      
+    } else if (!is.null(input$laz_folder_area.pc_upload) && input$laz_folder_check_area) {
+      clippedDSMPath()
+      
+    } else {
+      print("Invalid DSM path!")
+      return(NULL)
+    }
+  })
+  
+  
+  output$folder_name_pc <- renderText({
+    paste0("Destination folder: ", selected_folder_name_pc())
   })
  
   ## Field area PC
