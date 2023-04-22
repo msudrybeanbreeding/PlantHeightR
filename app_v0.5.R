@@ -146,7 +146,7 @@ clip_tab <- tabItem(
                   
                   conditionalPanel(
                     condition = "input.dsm_folder_check_area == true",
-                  actionButton("open_folder_dsm", "Open Folder", class = "btn btn-primary", disabled = TRUE)
+                    actionButton("open_folder_dsm", "Open Folder", class = "btn btn-primary", disabled = TRUE)
                   )
                   
                   
@@ -1315,7 +1315,10 @@ clipper.area.dsm <- function(dsm_list, shape, n.core) {
               clipped_dsm_path <- paste0(DSM.c_names, "_clip.tif")
               
               writeRaster(DSM.c, clipped_dsm_path, format = "GTiff", overwrite=TRUE)
-              clipped_dsm_path
+              
+              # Return the generated DSM file paths
+              return(paste0(DSM.c_names, "_clip.tif"))
+              
               
             },
     error = function(e) {
@@ -2533,6 +2536,7 @@ observeEvent(list(input$laz_folder, input$laz_upload), {
       uploaded_file_names <- input$dsm_upload_area$name # Get the original file names
       message("Print file names")
       print(uploaded_files)
+      print(temp_dir)
       
       # Save the uploaded TIF files in temp_dir with their original file names
       temp_files <- file.path(temp_dir, uploaded_file_names)
@@ -3852,7 +3856,7 @@ img_area.dsm <- reactive({
     clipped_dsm_paths_rv$clipped_dsm_paths <- clippedDSMPath()
     
     cat("clipped_dsm_paths:", clippedDSMPath(), "\n")
-
+    
   })
 })
 
@@ -3883,6 +3887,12 @@ observeEvent(input$open_folder_dsm, {
   }
 })
 
+## Clip point cloud function
+observeEvent(input$Clip_DSM, {
+  
+  if(is.null(input$dsm_folder_area)) {return("No data found")}
+  img_area.dsm()
+})
 
 ### Clipping Point Cloud 
 # Add a reactive value to store the clipped_laz_paths
@@ -3933,15 +3943,6 @@ observeEvent(input$open_folder_laz, {
     showNotification("Folder path not available", type = "error")
   }
 })
-
-
-## Clip DSM function
-observeEvent(input$Clip_DSM, {
-  
-  if(is.null(input$dsm_folder_area)) {return("No data found")}
-  img_area.dsm()
-})
-
 
 
 ## Clip point cloud function
