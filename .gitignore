@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+version/
+aux_scripts/
+rsconnect/
