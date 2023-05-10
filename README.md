@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/620390613.svg)](https://zenodo.org/badge/latestdoi/620390613)
+
 # *PlantHeightR - R shiny application to estimate plant height (EPH)*
 
 ## Online access:
